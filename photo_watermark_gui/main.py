@@ -10,13 +10,13 @@ import os
 from pathlib import Path
 
 # 添加项目根目录到Python路径
-project_root = Path(__file__).parent
+project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
-from ui.main_window import MainWindow
+from photo_watermark_gui.ui.main_window import MainWindow
 
 
 def main():

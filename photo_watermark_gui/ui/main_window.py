@@ -11,15 +11,19 @@ from typing import Optional
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QMenuBar, QStatusBar, QAction, QMessageBox, QLabel, QPushButton,
-    QFrame, QSizePolicy
+    QFrame, QSizePolicy, QFileDialog
 )
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QIcon, QKeySequence
 
 # 导入核心模块
-from core.image_manager import ImageManager
-from core.watermark_engine import WatermarkEngine, WatermarkSettings
-from core.config_manager import ConfigManager
+from ..core.image_manager import ImageManager
+from ..core.watermark_engine import WatermarkEngine, WatermarkSettings
+from ..core.config_manager import ConfigManager
+
+# 导入UI组件
+from .image_list_widget import ImageListWidget
+from .preview_widget import ImagePreviewWidget
 
 
 class MainWindow(QMainWindow):
@@ -36,7 +40,7 @@ class MainWindow(QMainWindow):
         self.watermark_engine = WatermarkEngine()
         self.config_manager = ConfigManager()
         
-        # UI组件（后续实现）
+        # UI组件
         self.image_list_widget = None
         self.preview_widget = None  
         self.settings_panel = None
@@ -47,8 +51,8 @@ class MainWindow(QMainWindow):
         
         # 初始化UI
         self.setup_ui()
-        self.setup_layout()
-        self.setup_connections()
+        self.setup_layout()       # 先创建UI组件
+        self.setup_connections()  # 再连接信号
         self.setup_menu_bar()
         self.setup_status_bar()
         
@@ -115,17 +119,31 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(5, 5, 5, 5)
         
-        # 标题
+        # 标题和操作按钮
+        header_layout = QHBoxLayout()
+        
         title_label = QLabel("图片列表")
         title_label.setStyleSheet("font-weight: bold; font-size: 14px; padding: 5px;")
-        layout.addWidget(title_label)
+        header_layout.addWidget(title_label)
+        header_layout.addStretch()
         
-        # 图片列表区域（占位符）
-        list_placeholder = QLabel("图片列表组件\n（待实现）")
-        list_placeholder.setAlignment(Qt.AlignCenter)
-        list_placeholder.setStyleSheet("border: 1px dashed gray; padding: 20px; color: gray;")
-        list_placeholder.setMinimumHeight(300)
-        layout.addWidget(list_placeholder)
+        # 导入按钮
+        import_btn = QPushButton("导入")
+        import_btn.setFixedSize(60, 25)
+        import_btn.clicked.connect(self.import_files)
+        header_layout.addWidget(import_btn)
+        
+        # 清空按钮
+        clear_btn = QPushButton("清空")
+        clear_btn.setFixedSize(60, 25)
+        clear_btn.clicked.connect(self.clear_images)
+        header_layout.addWidget(clear_btn)
+        
+        layout.addLayout(header_layout)
+        
+        # 图片列表组件
+        self.image_list_widget = ImageListWidget()
+        layout.addWidget(self.image_list_widget)
         
         # 操作按钮
         btn_layout = QVBoxLayout()
@@ -154,34 +172,11 @@ class MainWindow(QMainWindow):
         panel.setMinimumWidth(400)
         
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setContentsMargins(2, 2, 2, 2)
         
-        # 标题
-        title_label = QLabel("预览区域")
-        title_label.setStyleSheet("font-weight: bold; font-size: 14px; padding: 5px;")
-        layout.addWidget(title_label)
-        
-        # 预览区域（占位符）
-        preview_placeholder = QLabel("预览区域\n\n请导入图片开始使用")
-        preview_placeholder.setAlignment(Qt.AlignCenter)
-        preview_placeholder.setStyleSheet(
-            "border: 2px dashed #ccc; "
-            "background-color: #f9f9f9; "
-            "padding: 40px; "
-            "color: #666; "
-            "font-size: 16px;"
-        )
-        preview_placeholder.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        layout.addWidget(preview_placeholder)
-        
-        # 图片信息栏
-        info_label = QLabel("就绪")
-        info_label.setStyleSheet("padding: 5px; background-color: #f0f0f0; border: 1px solid #ddd;")
-        layout.addWidget(info_label)
-        
-        # 保存组件引用
-        self.preview_placeholder = preview_placeholder
-        self.image_info_label = info_label
+        # 预览组件
+        self.preview_widget = ImagePreviewWidget()
+        layout.addWidget(self.preview_widget)
         
         return panel
     
@@ -247,6 +242,11 @@ class MainWindow(QMainWindow):
         # 配置管理器信号
         self.config_manager.config_loaded.connect(self.on_config_loaded)
         self.config_manager.config_saved.connect(self.on_config_saved)
+        
+        # UI组件信号
+        if self.image_list_widget is not None:
+            self.image_list_widget.images_added.connect(self.on_ui_images_added)
+            self.image_list_widget.image_selected.connect(self.on_image_selected)
         
         # 状态消息信号
         self.status_message.connect(self.show_status_message)
@@ -469,17 +469,26 @@ class MainWindow(QMainWindow):
     # 菜单动作实现
     def import_files(self):
         """导入文件"""
-        self.status_message.emit("导入文件功能待实现", 3000)
-        # TODO: 实现文件选择对话框
+        file_filter = "图片文件 (*.jpg *.jpeg *.png *.bmp *.tiff *.tif *.webp);;所有文件 (*.*)"
+        files, _ = QFileDialog.getOpenFileNames(
+            self, "选择图片文件", "", file_filter
+        )
+        
+        if files:
+            self.image_list_widget.add_files(files)
     
     def import_folder(self):
         """导入文件夹"""
-        self.status_message.emit("导入文件夹功能待实现", 3000)
-        # TODO: 实现文件夹选择对话框
+        folder = QFileDialog.getExistingDirectory(
+            self, "选择图片文件夹", ""
+        )
+        
+        if folder:
+            self.image_list_widget.add_files([folder])
     
     def clear_images(self):
         """清空图片列表"""
-        if not self.image_manager.is_empty:
+        if self.image_list_widget and self.image_list_widget.image_paths:
             reply = QMessageBox.question(
                 self, '确认清空', 
                 '确定要清空所有图片吗？',
@@ -488,6 +497,9 @@ class MainWindow(QMainWindow):
             )
             
             if reply == QMessageBox.Yes:
+                self.image_list_widget.clear_images()
+                self.preview_widget.clear_preview()
+                self.status_message.emit("已清空图片列表", 2000)
                 self.image_manager.clear_images()
     
     def export_images(self):
@@ -515,6 +527,23 @@ class MainWindow(QMainWindow):
             self.showMaximized()
             self.window_mode_action.setText('还原窗口')
             self.status_message.emit("已最大化窗口", 2000)
+    
+    def on_ui_images_added(self, image_paths: list):
+        """UI添加图片事件"""
+        # 将新增图片同步到图片管理器
+        for image_path in image_paths:
+            self.image_manager.add_images([image_path])
+        
+        self.status_message.emit(f"已添加 {len(image_paths)} 张图片", 2000)
+        self.update_ui_state()
+    
+    def on_image_selected(self, image_path: str):
+        """图片选择事件"""
+        if image_path and self.preview_widget:
+            self.preview_widget.load_image(image_path)
+            
+            # 更新当前选择
+            self.image_manager.set_current_index_by_path(image_path)
     
     def show_about(self):
         """显示关于对话框"""

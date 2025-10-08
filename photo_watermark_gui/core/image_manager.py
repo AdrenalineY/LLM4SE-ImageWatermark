@@ -207,3 +207,11 @@ class ImageManager(QObject):
             'total_size_mb': total_size / (1024 * 1024),
             'formats': formats
         }
+    
+    def set_current_index_by_path(self, file_path: str):
+        """通过文件路径设置当前索引"""
+        for i, img in enumerate(self.images):
+            if str(img.file_path) == file_path:
+                self.current_index = i
+                return True
+        return False
